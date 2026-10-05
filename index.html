@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תיקון וסידור טקסט עברי משובש (BiDi Clean)</title>
+    <link rel="icon" type="image/png" href="https://i.ibb.co/nqsNC0JT/image.png">
+    <link rel="apple-touch-icon" href="https://i.ibb.co/nqsNC0JT/image.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Rubik', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .bidi-override {
+            unicode-bidi: plaintext;
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans min-h-screen flex flex-col transition-colors duration-200">
+
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-none text-slate-900 dark:text-white">מתקן הפיסוק והעברית</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">תיקון בעיות RTL/LTR, נקודות הפוכות ומרכאות מג'ימיני ו-ChatGPT</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 space-x-reverse">
+                <!-- Preset Dropdown -->
+                <select id="presetSelect" onchange="applyPreset(this.value)" class="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 rounded-lg px-3 py-2 font-medium focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                    <option value="standard">פרופיל: רגיל (מומלץ)</option>
+                    <option value="aggressive">פרופיל: אגרסיבי (לעברית/אנגלית מעורבת)</option>
+                    <option value="minimal">פרופיל: מינימלי (רווחים ופיסוק בלבד)</option>
+                </select>
+
+                <!-- Dark Mode Toggle -->
+                <button id="themeToggle" onclick="toggleTheme()" class="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none transition-colors" title="החלף ערכת נושא">
+                    <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+
+        <!-- Notification Toast -->
+        <div id="toast" class="fixed bottom-5 left-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 ease-in-out bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 space-x-reverse">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-green-400 dark:text-green-600 text-lg"></i>
+            <span id="toastMessage" class="text-sm font-medium">הפעולה בוצעה בהצלחה</span>
+        </div>
+
+        <!-- Quick Info Banner -->
+        <div class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm">
+            <div class="flex items-start space-x-3 space-x-reverse">
+                <i class="fa-solid fa-circle-info text-blue-600 dark:text-blue-400 text-lg mt-0.5"></i>
+                <div>
+                    <strong class="font-semibold text-blue-900 dark:text-blue-200">איך זה עובד?</strong>
+                    <span class="text-blue-800 dark:text-blue-300"> הבלבול בסימני פיסוק וסוגריים בסוף שורה קורה כשיש שילוב של עברית עם אנגלית/מספרים. הכלי מסדר את כיווניות התווים ומכניס תווי RLM/LRM נסתרים.</span>
+                </div>
+            </div>
+            <button onclick="toggleOptionsModal()" class="whitespace-nowrap text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline flex items-center gap-1 self-end md:self-auto">
+                <i class="fa-solid fa-sliders"></i> הגדרות חוקים מתקדמות
+            </button>
+        </div>
+
+        <div id="rulesDrawer" class="hidden bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h2 class="font-semibold text-sm flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                    <i class="fa-solid fa-filter text-blue-500"></i> חוקי ניקוי פעילים
+                </h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="resetRulesToDefault()" class="text-xs text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 underline">איפוס לברירת מחדל</button>
+                    <button onclick="toggleOptionsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"><i class="fa-solid fa-xmark text-base"></i></button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-bidi-rlm" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">הוספת תו RLM בסוף שורות בעברית עם אנגלית/מספרים</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-fix-quotes" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">תיקון מרכאות הפוכות ("...")</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-fix-parentheses" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">תיקון סוגריים הפוכים בשילוב עברית ואנגלית</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-fix-spaces" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">ניקוי רווחים כפולים ורווחים לפני פיסוק</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-fix-lists" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">יישור רשימות תבליטים ומספרים (Markdown Lists)</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-remove-control-chars" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">הסרת תווי בקרה נסתרים משובשים</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-remove-blank-lines" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">מניעת שורה ריקה בין פסקאות</span>
+                </label>
+
+                <label class="flex items-center space-x-2 space-x-reverse cursor-pointer bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input type="checkbox" id="rule-fix-dash" checked onchange="processText()" class="rounded text-blue-600 focus:ring-blue-500">
+                    <span class="text-slate-700 dark:text-slate-200 font-medium">החלפת מקף ארוך (— / –) במקף רגיל (-)</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[480px]">
+            <!-- Input Text Area -->
+            <div class="flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div class="bg-slate-50 dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div class="flex items-center space-x-2 space-x-reverse">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                        <h2 class="font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300">טקסט מקורי (הדבק כאן)</h2>
+                    </div>
+                    <button onclick="clearInput()" class="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> ניקוי
+                    </button>
+                </div>
+                <textarea id="inputText" oninput="processText()" placeholder="הדבק כאן את הטקסט המשובש מג'ימיני, ChatGPT או כל מקור אחר..." class="w-full flex-1 p-4 bg-transparent resize-none border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-100 text-base leading-relaxed bidi-override font-sans placeholder-slate-400 dark:placeholder-slate-500"></textarea>
+                <div class="p-3 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
+                    <span id="inputStats">0 תווים | 0 מילים</span>
+                    <button onclick="pasteFromClipboard()" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium">
+                        <i class="fa-solid fa-paste"></i> הדבק מהלוח
+                    </button>
+                </div>
+                <div class="p-3 border-t border-slate-100 dark:border-slate-700/50 flex flex-col gap-2">
+                    <button id="fixBtn" onclick="fixOnServer()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-colors cursor-pointer">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> תקן טקסט
+                    </button>
+                    <p class="text-[11px] leading-snug text-slate-500 dark:text-slate-400 flex items-start gap-1.5">
+                        <i class="fa-solid fa-circle-info mt-0.5"></i>
+                        <span>בלחיצה על "תקן טקסט" הטקסט נשלח לשרת יחד עם הכללים שבחרת, והתוצאה המתוקנת חוזרת ומוצגת כאן. הסיבה לכך היא שחלק מהעיבוד הטכני מתבצע בשרת. קודם כל השרת מפענח את הטקסט באופן כללי, ורק אם התיקון מסתבך במיוחד הטקסט נשלח גם לבינה מלאכותית. כך חוסכים בבקשות ל־AI.</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Output Text Area -->
+            <div class="flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-blue-200 dark:border-blue-900/50 shadow-sm overflow-hidden relative">
+                <div class="bg-blue-50/50 dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div class="flex items-center space-x-2 space-x-reverse">
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                        <h2 class="font-bold text-xs uppercase tracking-wider text-blue-700 dark:text-blue-400">טקסט מתוקן ומסודר</h2>
+                    </div>
+                    <div class="flex items-center space-x-2 space-x-reverse">
+                        <button onclick="togglePreviewMode()" id="previewBtn" class="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-eye"></i> תצוגה מעוצבת
+                        </button>
+                    </div>
+                </div>
+
+                <div id="outputContainer" class="relative flex-1 flex flex-col">
+                    <textarea id="outputText" readonly placeholder="לחץ על ״תקן טקסט״ והתוצאה מהשרת תופיע כאן..." class="w-full flex-1 p-4 bg-transparent resize-none border-0 focus:ring-0 focus:outline-none text-slate-900 dark:text-slate-50 text-base leading-relaxed bidi-override font-sans"></textarea>
+                    
+                    <div id="formattedPreview" class="hidden w-full flex-1 p-4 overflow-y-auto text-slate-900 dark:text-slate-50 text-base leading-relaxed bidi-override font-sans whitespace-pre-wrap"></div>
+                </div>
+
+                <div class="p-3 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-xs">
+                    <span id="outputStats" class="text-slate-400">0 תווים | 0 מילים</span>
+                    <button onclick="copyOutput()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition-colors cursor-pointer">
+                        <i class="fa-solid fa-copy"></i> העתק טקסט מתוקן
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Check local storage or system preference for dark mode
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('themeIcon').className = 'fa-solid fa-sun text-lg';
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.getElementById('themeIcon').className = 'fa-solid fa-moon text-lg';
+        }
+
+        let isPreviewMode = false;
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.theme = isDark ? 'dark' : 'light';
+            document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun text-lg' : 'fa-solid fa-moon text-lg';
+            showToast(isDark ? 'מצב כהה הופעל' : 'מצב בהיר הופעל');
+        }
+
+        function toggleOptionsModal() {
+            const drawer = document.getElementById('rulesDrawer');
+            drawer.classList.toggle('hidden');
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.textContent = message;
+            if (isError) {
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-red-400 text-lg';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-check text-green-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function applyPreset(preset) {
+            const rlm = document.getElementById('rule-bidi-rlm');
+            const quotes = document.getElementById('rule-fix-quotes');
+            const parens = document.getElementById('rule-fix-parentheses');
+            const spaces = document.getElementById('rule-fix-spaces');
+            const lists = document.getElementById('rule-fix-lists');
+            const ctrl = document.getElementById('rule-remove-control-chars');
+
+            const blankLines = document.getElementById('rule-remove-blank-lines');
+            const dash = document.getElementById('rule-fix-dash');
+
+            if (preset === 'standard') {
+                rlm.checked = true;
+                quotes.checked = true;
+                parens.checked = true;
+                spaces.checked = true;
+                lists.checked = true;
+                ctrl.checked = true;
+                blankLines.checked = true;
+                dash.checked = true;
+            } else if (preset === 'aggressive') {
+                rlm.checked = true;
+                quotes.checked = true;
+                parens.checked = true;
+                spaces.checked = true;
+                lists.checked = true;
+                ctrl.checked = true;
+                blankLines.checked = true;
+                dash.checked = true;
+            } else if (preset === 'minimal') {
+                rlm.checked = false;
+                quotes.checked = false;
+                parens.checked = false;
+                spaces.checked = true;
+                lists.checked = false;
+                ctrl.checked = true;
+                blankLines.checked = false;
+                dash.checked = false;
+            }
+            processText();
+            showToast('פרופיל הגדרות עודכן');
+        }
+
+        function resetRulesToDefault() {
+            document.getElementById('presetSelect').value = 'standard';
+            applyPreset('standard');
+        }
+
+        const API_URL = 'https://hebrew-fixer.tohuvavohu2000.workers.dev/';
+        let isBusy = false;
+
+        // Runs on typing / option change: only refreshes the stats (nothing is sent to the server)
+        function processText() {
+            const input = document.getElementById('inputText').value;
+            if (!input) {
+                document.getElementById('outputText').value = '';
+                document.getElementById('formattedPreview').innerText = '';
+            }
+            updateStats(input, document.getElementById('outputText').value);
+        }
+
+        // Sends the text to the server and shows the server's result
+        async function fixOnServer() {
+            if (isBusy) return;
+            const input = document.getElementById('inputText').value;
+            if (!input.trim()) {
+                showToast('אין טקסט לתיקון', true);
+                return;
+            }
+
+            const g = id => document.getElementById(id).checked;
+            const btn = document.getElementById('fixBtn');
+            const originalLabel = btn.innerHTML;
+            isBusy = true;
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-wait');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> מעבד...';
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: input,
+                        options: {
+                            rlm: g('rule-bidi-rlm'),
+                            quotes: g('rule-fix-quotes'),
+                            parens: g('rule-fix-parentheses'),
+                            spaces: g('rule-fix-spaces'),
+                            lists: g('rule-fix-lists'),
+                            ctrl: g('rule-remove-control-chars'),
+                            blankLines: g('rule-remove-blank-lines'),
+                            dash: g('rule-fix-dash')
+                        }
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                document.getElementById('outputText').value = data.result;
+                document.getElementById('formattedPreview').innerText = data.result;
+                updateStats(input, data.result);
+                showToast('הטקסט תוקן בהצלחה');
+            } catch (err) {
+                showToast('שגיאה בהתחברות לשרת, נסה שוב', true);
+            } finally {
+                isBusy = false;
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-wait');
+                btn.innerHTML = originalLabel;
+            }
+        }
+
+        function updateStats(input, output) {
+            const countWords = (str) => str.trim() ? str.trim().split(/\s+/).length : 0;
+            
+            document.getElementById('inputStats').textContent = `${input.length} תווים | ${countWords(input)} מילים`;
+            document.getElementById('outputStats').textContent = `${output.length} תווים | ${countWords(output)} מילים`;
+        }
+
+        function clearInput() {
+            document.getElementById('inputText').value = '';
+            processText();
+            showToast('הטקסט נוקה');
+        }
+
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    document.getElementById('inputText').value = text;
+                    processText();
+                    showToast('הטקסט הודבק בהצלחה');
+                }
+            } catch (err) {
+                showToast('לא ניתן לגשת ללוח העתקה', true);
+            }
+        }
+
+        function copyOutput() {
+            const output = document.getElementById('outputText');
+            if (!output.value) {
+                showToast('אין טקסט להעתקה', true);
+                return;
+            }
+
+            // Fallback for iframe / copy restrictions
+            output.select();
+            document.execCommand('copy');
+            showToast('הטקסט המתוקן הועתק ללוח!');
+        }
+
+        function togglePreviewMode() {
+            const textarea = document.getElementById('outputText');
+            const preview = document.getElementById('formattedPreview');
+            const btn = document.getElementById('previewBtn');
+
+            isPreviewMode = !isPreviewMode;
+
+            if (isPreviewMode) {
+                textarea.classList.add('hidden');
+                preview.classList.remove('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-code"></i> תצוגת טקסט';
+                btn.classList.add('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900/50');
+            } else {
+                textarea.classList.remove('hidden');
+                preview.classList.add('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-eye"></i> תצוגה מעוצבת';
+                btn.classList.remove('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900/50');
+            }
+        }
+
+        // Run default demo on load if empty
+        window.onload = function() {
+            const sampleText = "שלום לכולם, זוהי דוגמה לטקסט עם אנגלית (like GPT-4 and Gemini) שגורם לנקודות ולסימני פיסוק לקפוץ לסדרי שורות לא נכונים בסוף משפט!";
+            document.getElementById('inputText').value = sampleText;
+            processText(); // stats only; press the fix button to send to the server
+        }
+    </script>
+</body>
+</html>
